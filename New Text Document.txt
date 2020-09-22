@@ -1,0 +1,420 @@
+import io.github.sukgu.Shadow;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.openqa.selenium.*;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.*;
+
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public class MainTest {
+
+    private static final String targetURL = "https://s00-0000-aa02.sogaz.ru/AdInsure.Client/entry";
+
+    private static final String CHROME = "webdrivers/chromedriver.exe";
+    private static final String CHROME_PATH = "webdriver.chrome.driver";
+    private static final String FIREFOX = "webdrivers/geckodriver.exe";
+    private static final String FIREFOX_PATH = "webdriver.gecko.driver";
+    private static WebDriver driver;
+    private static Wait<WebDriver> wait;
+    private static Actions action;
+    private static ChromeOptions options;
+    private static JavascriptExecutor js;
+    private static Shadow shadow;
+    private static Map<String, Map<String, WebElement>> webBlocks;
+    private static HashMap<String, WebElement> buttons;
+
+    private static WebElement shadowDom;
+
+
+    @Before
+    public void initialization() {
+        System.setProperty(CHROME_PATH, CHROME);
+        options = new ChromeOptions().addArguments("--start-maximized");
+        driver = new ChromeDriver(options);
+        //options = new FirefoxOptions().addArguments("--start-maximized");
+        //driver = new FirefoxDriver();
+        wait = new WebDriverWait(driver, 5)
+                .ignoring(NoSuchElementException.class, StaleElementReferenceException.class);
+        driver.manage().timeouts().pageLoadTimeout(10, TimeUnit.SECONDS);
+        action = new Actions(driver);
+        js = (JavascriptExecutor) driver;
+        shadow = new Shadow(driver);
+        buttons = new HashMap<>();
+    }
+
+    @Test
+    public void test() {
+
+        driver.get(targetURL);
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("div#enter-button"))).click();
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input[value='ADINSURE']")));
+        insertValue(driver.findElement(By.cssSelector("input#username")), "GromovIL");
+        insertValue(driver.findElement(By.cssSelector("input#password")), "!123456q!");
+        driver.findElement(By.cssSelector("input[value='ADINSURE']")).click();
+        driver.findElement(By.cssSelector("button#login_button")).click();
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//span[contains(text(), 'Привет,')]")));
+        clickButton("Документы");
+        clickButton("Имущество ЮЛ");
+        clickButton("Сделка");
+        //__________________________________________
+
+//        waitPlease(1000);
+//        WebElement shadowdom1 = shadowDom;
+//        WebElement sh = findByShadowButton();
+//        List<WebElement> zz = findByShadows();
+//        HashMap<String, WebElement> zzz = new HashMap<>();
+//        for (WebElement el : zz) {
+//            try {
+//                WebElement label = el.findElement(By.cssSelector("label[container='body']"));
+//                System.out.println(label.getText());
+//                zzz.put(label.getText(), el);
+//            } catch (NoSuchElementException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        //System.out.println(sh.getText());
+//        waitPlease(1000);
+
+
+        //__________________________________________
+        checkStaticElement( " (НОВАЯ СДЕЛКА)",
+                "span[class='ai-bold ai-whitespace']");
+
+        shadowDom = (WebElement)js.executeScript("return arguments[0].shadowRoot",
+                driver.findElement(By.cssSelector("versioned-document")));
+
+        findWebBlocks();
+
+        clickShadowElementBySmth(" - поиск", "СТРАХОВАТЕЛЬ");
+        shadow.findElement("input.form-control").sendKeys("Рога и копыта" + Keys.RETURN);
+        //search("ПОИСК КОНТРАГЕНТОВ", "Поиск", "Рога и копыта");
+        clickButton("Рога и копыта");
+        clickButton("Выбрать");
+
+        clickShadowElementBySmth("Канал продаж", "ДАННЫЕ СДЕЛКИ");
+        clickElementByName("div.ng-option span", "Прямые продажи");
+        clickShadowElementBySmth("Зона ответственности", "ДАННЫЕ СДЕЛКИ");
+        clickElementByName("div.ng-option span", "Тимошенко М.М.");
+        clickShadowElementBySmth("Профильная программа", "ДАННЫЕ СДЕЛКИ");
+        clickElementByName("div.ng-option span", "ПРОЧИЕ");
+        clickShadowElementBySmth("Перевод портфеля ВТБс", "ДАННЫЕ СДЕЛКИ");
+        clickElementByName("div.ng-option span", "Нет");
+
+        clickShadowElementBySmth("Подразделение сделки - поиск", "ДАННЫЕ СДЕЛКИ");
+//        search("ПОИСК ПОДРАЗДЕЛЕНИЯ", "Подразделение", "Головной офис");
+//        clickButton("Головной офис");
+//        clickButton("Выбрать");
+
+        while (true) {
+            try {
+                shadow.findElement("table");
+                break;
+            } catch (Exception e) {}
+        }
+
+        shadow.findElements("div.container-fluid").forEach(block -> {
+            try {
+                if (shadow.findElement(block, "span").getText().equalsIgnoreCase("Поиск подразделения")) {
+                    WebElement input = shadow.findElements(block, "input.form-control").get(1);
+                    //WebElement input = shadow.findElement(block, "input.form-control[class$='ng-touched']");
+                    input.sendKeys("Головной офис" + Keys.RETURN);
+                    clickButton("Головной офис");
+                    clickButton("Выбрать");
+                }
+            } catch (InvalidElementStateException e) {}
+        });
+
+
+        checkFilledField("Канал продаж", "ДАННЫЕ СДЕЛКИ", "Прямые продажи",
+                "span.ng-value-label");
+        checkFilledField("Зона ответственности", "ДАННЫЕ СДЕЛКИ", "Тимошенко М.М.",
+                "span.ng-value-label");
+        checkFilledField("Профильная программа", "ДАННЫЕ СДЕЛКИ", "ПРОЧИЕ",
+                "span.ng-value-label");
+        checkFilledField("Перевод портфеля ВТБс", "ДАННЫЕ СДЕЛКИ", "Нет",
+                "span.ng-value-label");
+
+        Assert.assertEquals("Страхователь не выбран", "Рога и Копыта",
+                shadow.findElement("div[class='ai-text  ai-extended-icon ']").getText());
+        Assert.assertEquals("Подразделение сделки не указано", "Головной офис",
+                shadow.findElement(webBlocks.get("ДАННЫЕ СДЕЛКИ").get("Подразделение сделки"), "input")
+                        .getAttribute("value"));
+
+        clickButton("СОХРАНИТЬ");
+
+        String id = shadow.findElement("div[class='ai-text  ai-extended-icon blue normal uppercase']").getText();
+        System.out.println("Присвоен ID сделки: " + id);
+
+        checkStaticElement("В документе 0 ошибки", "span.ai-title");
+
+        clickButton("ДЕЙСТВИЯ");
+        clickButton(" Создать котировку из сделки ");
+        clickButton("ДА");
+
+        checkStaticElement( " (НОВАЯ КОТИРОВКА)",
+                "span[class='ai-bold ai-whitespace']");
+
+        clickButton("Локации");
+        findWebBlocks();
+
+        scanWebBlock("ЛОКАЦИИ");
+        webBlocks.get("ЛОКАЦИИ").get("Реальное количество локаций по котировке").sendKeys("5");
+        clickShadowElementBySmth("Валюта", "ЛОКАЦИИ");
+        clickElementByName("div.ng-option span", "руб.");
+        clickShadowElementBySmth("Страховое покрытие", "ЛОКАЦИИ");
+        clickElementByName("div.ng-option span", "С ответственностью за все риски ");
+        clickButton("Не применяется");
+
+        Assert.assertEquals("Реальное количество локаций по котировке не заполнено", "5",
+                shadow.findElement(webBlocks.get("ЛОКАЦИИ").get("Подразделение сделки"), "input")
+                        .getAttribute("value"));
+        checkFilledField("Валюта", "ЛОКАЦИИ", "руб.",
+                "span.ng-value-label");
+        checkFilledField("Страховое покрытие", "ЛОКАЦИИ", "С ответственностью за все риски ",
+                "span.ng-value-label");
+        Assert.assertTrue("Франшиза по каждому страховому случаю (общая): чекбокс 'Не применяется' не отмечен",
+                shadow.findElement(webBlocks.get("ЛОКАЦИИ").get("Не применяется"),
+                        "i[class$='ai-blue-checkbox-icon']").isDisplayed());
+
+
+    }
+
+    private WebElement expandRootElement(WebElement element) {
+        WebElement ele = (WebElement) ((JavascriptExecutor) driver).executeScript("return arguments[0].shadowRoot",element);
+        return ele;
+    }
+    private void findByShadowRoot(WebDriver driver) {
+        shadowDom = expandRootElement(driver.findElement(By.cssSelector("versioned-document")));
+    }
+    private WebElement findByShadowButton() {
+        findByShadowRoot(driver);
+        return shadowDom.findElement(By.cssSelector("span[class='ai-bold ai-whitespace']"));
+    }
+    private List<WebElement> findByShadows() {
+        return shadowDom.findElements(By.cssSelector("div.form-group"));
+    }
+    private HashMap<String, WebElement> find(List<WebElement> els) {
+        HashMap<String, WebElement> map = new HashMap<>();
+        for (WebElement el : els) {
+            try {
+                WebElement label = el.findElement(By.cssSelector("label[container='body']"));
+                map.put(label.getText(), el);
+            } catch (NoSuchElementException e) {
+                e.printStackTrace();
+            }
+        }
+//        els.forEach(el -> {
+//            try {
+////                WebElement label = (WebElement) ((JavascriptExecutor) driver).executeScript(
+////                        "return arguments[0].querySelector('label[container='body']')", el);
+//                WebElement label = el.findElement(By.cssSelector("label[container='body']"));
+//                map.put(label.getText(), el);
+//            } catch (NoSuchElementException e) {e.printStackTrace();}
+//        });
+        return map;
+    }
+
+    public void search(String searchName, String paramField, String value) {
+        while (true)
+            try {
+                shadow.findElement("table");
+                break;
+            } catch (Exception e) {}
+
+        if (webBlocks.containsKey(searchName)) {
+            webBlocks.get(searchName).get(paramField).sendKeys(value);
+        } else {
+            shadow.findElements("div.container-fluid").forEach(block -> {
+                try {
+                    if (shadow.findElement(block, "span").getText().equalsIgnoreCase(searchName)) {
+                        List<WebElement> paramFieldNames = shadow.findElements(block,
+                                "div.form-group > input-label-bootstrap > label");
+                        List<WebElement> paramFields = shadow.findElements(block,
+                                "div.form-group > input-label-bootstrap + input");
+                        HashMap<String, WebElement> temp = new HashMap<>();
+                        for (int i = 0; i < paramFieldNames.size(); i++) {
+                            temp.put(paramFieldNames.get(i).getText(), paramFields.get(i));
+                        }
+                        webBlocks.put(searchName, temp);
+                        webBlocks.get(searchName).get(paramField).sendKeys(value);
+                    }
+                } catch (InvalidElementStateException e) {
+                }
+            });
+        }
+    }
+
+
+    public void clickButton(String button) {
+        button = button.trim().toLowerCase();
+        try {
+            buttons.get(button).click();
+        } catch (Exception e) {
+            shadow.findElements("span, i, button, div#enter-button, div#login_button, div.ai-text").forEach(
+                    bttn -> {
+                        String text = bttn.getText().trim().toLowerCase();
+                        if (text.equals("дa"))  //на сайте прикол с латинской 'a'
+                            text = "да";        //замена на кириллическую 'а'
+                        buttons.put(text, bttn);
+            });
+            if (buttons.get(button) != null) {
+                js.executeScript("return arguments[0].scrollIntoView(false)", buttons.get(button));
+                buttons.get(button).click();
+            } else {
+                Assert.fail("Не найдена кнопка: " + button);
+            }
+        }
+    }
+
+
+    public void findWebBlocks() {
+        webBlocks = new LinkedHashMap<>();
+        System.out.println("Найденные веб-блоки: ");
+        shadowDom.findElements(By.cssSelector("label[placement='top']")).forEach(block -> {
+            String blockName = block.getText();
+            System.out.println(blockName);
+            webBlocks.put(blockName, null);
+        });
+    }
+
+    public void scanWebBlock(String blockName) {
+        System.out.println("Сканирование блока " + blockName);
+        Map<String, WebElement> blockElements = new HashMap<>();
+        Map<String, WebElement> temp = new HashMap<>();
+
+        List<WebElement> webBlockNames = shadowDom.findElements(By.cssSelector("label[placement='top']"));
+        List<WebElement> webBlocksTemp = shadowDom.findElements(By.cssSelector("div.ai-section-1"));
+
+        for (int i = 0; i < webBlockNames.size(); i++) {
+            temp.put(webBlockNames.get(i).getText(), webBlocksTemp.get(i));
+        }
+
+        final AtomicReference<String> name = new AtomicReference<>();
+        new LinkedList<>(temp.get(blockName).findElements(By.cssSelector("div.form-group")))
+        //new LinkedList<>(shadow.findElements(temp.get(blockName), "div.form-group"))
+                .descendingIterator().forEachRemaining(element -> {
+            try {
+                //String label = shadow.findElement(element, "label").getText();
+                String label = element.findElement(By.cssSelector("label")).getText();
+                blockElements.put(label, element);
+                name.set(label);
+                System.out.println("Найден элемент: " + label);
+            } catch (ElementNotVisibleException | NoSuchElementException e) {
+                if (name.get().equals("ИНН контрагента"))
+                    name.set("Наименование");
+                blockElements.put(name.get() + " - поиск", element);
+                System.out.println("Найден элемент: " + name.get() + " - поиск");
+
+            }
+        });
+        webBlocks.put(blockName, blockElements);
+    }
+
+    public void clickShadowElementBySmth(String smth, String blockName) {
+        List<String> selectorsList = new ArrayList<>(Arrays.asList("div", "input", "ng-select", "button", "i"));
+        if (webBlocks.get(blockName) == null) {
+            scanWebBlock(blockName);
+        }
+        for (String selectors : selectorsList) {
+            try {
+                WebElement element = webBlocks.get(blockName).get(smth);
+                js.executeScript("return arguments[0].scrollIntoView(false)", element);
+                waitPlease(500);
+                shadow.findElement(element, selectors).click();
+                break;
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    public void checkStaticElement(String expected, String cssSelector) {
+        try {
+            Assert.assertEquals("Заголовок/поле '" + expected + "' не появился", expected,
+                    shadow.findElement(cssSelector).getText());
+        } catch (StaleElementReferenceException|ElementNotVisibleException e) {
+            waitPlease(1000);
+            Assert.assertEquals("Заголовок/поле '" + expected + "' не появился", expected,
+                    shadow.findElement(cssSelector).getText());
+        }
+
+    }
+
+    public void checkReadyState() {
+        wait.until((ExpectedCondition<Boolean>) driver ->
+                js.executeScript("return document.readyState").equals("complete"));
+    }
+
+    public void checkFilledField(String fieldName, String blockName, String expected, String cssSelector) {
+        Assert.assertEquals("Поле '" + fieldName + "' не заполнено", expected,
+                shadow.findElement(webBlocks.get(blockName).get(fieldName) ,cssSelector).getText());
+
+    }
+
+    public void clickElementByName(String cssSelector, String buttonName) {
+        List<WebElement> temporary = shadow.findElements(cssSelector);
+        for (WebElement element : temporary) {
+            if (element.getText().equalsIgnoreCase(buttonName)) {
+                try {
+                    element.click();
+                } catch (ElementClickInterceptedException e) {
+                    js.executeScript("return arguments[0].scrollIntoView(false)", element);
+                    waitPlease(500);
+                    element.click();
+                }
+                break;
+            }
+        }
+    }
+
+    public void clickElementByIndex(String cssSelector, int index) {
+        List<WebElement> temporary = shadow.findElements(cssSelector);
+        WebElement element = temporary.get(index);
+        try {
+            element.click();
+        } catch (ElementClickInterceptedException e) {
+            js.executeScript("return arguments[0].scrollIntoView(false)", element);
+            waitPlease(500);
+            element.click();
+        }
+    }
+
+
+    //метод ввода данных
+    public void insertValue(WebElement element, String value) {
+        element.click();
+        for (int j = 0; j < 5; j++) {
+            element.clear();
+            for (int i = 0; i < value.length(); i++) {
+                element.sendKeys(String.valueOf(value.charAt(i)));
+                waitPlease(10);
+            }
+            if (element.getAttribute("value").equals(value))
+                break;
+        }
+    }
+
+    public void waitPlease(int time) {
+        try {
+            Thread.sleep(time);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @After
+    public void closeTests() {
+        //driver.quit();
+    }
+}
